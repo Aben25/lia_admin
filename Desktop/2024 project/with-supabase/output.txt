@@ -1,0 +1,1061 @@
+Folder Structure
+--------------------------------------------------
+app/
+    favicon.ico
+    opengraph-image.png
+    twitter-image.png
+    actions.ts
+    layout.tsx
+    page.tsx
+    globals.css
+    (auth-pages)/
+        smtp-message.tsx
+        layout.tsx
+        sign-up/
+            page.tsx
+        forgot-password/
+            page.tsx
+        sign-in/
+            page.tsx
+    auth/
+        callback/
+            route.ts
+    components/
+        Header.tsx
+        Sidebar.tsx
+        ChildDetails.tsx
+        ui/
+            avatar.tsx
+    protected/
+        page.tsx
+        reset-password/
+            page.tsx
+    children/
+        [sponsorId]/
+            page.tsx
+        [id]/
+            page.tsx
+
+
+File Contents
+--------------------------------------------------
+
+
+./app/actions.ts
+File type: .ts
+"use server";
+
+import { encodedRedirect } from "@/utils/utils";
+import { createClient } from "@/utils/supabase/server";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+
+export const signUpAction = async (formData: FormData) => {
+  const email = formData.get("email")?.toString();
+  const password = formData.get("password")?.toString();
+  const supabase = createClient();
+  const origin = headers().get("origin");
+
+  if (!email || !password) {
+    return { error: "Email and password are required" };
+  }
+
+  const { error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      emailRedirectTo: `${origin}/auth/callback`,
+    },
+  });
+
+  if (error) {
+    console.error(error.code + " " + error.message);
+    return encodedRedirect("error", "/sign-up", error.message);
+  } else {
+    return encodedRedirect(
+      "success",
+      "/sign-up",
+      "Thanks for signing up! Please check your email for a verification link.",
+    );
+  }
+};
+
+export const signInAction = async (formData: FormData) => {
+  const email = formData.get("email") as string;
+  const password = formData.get("password") as string;
+  const supabase = createClient();
+
+  const { error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (error) {
+    return encodedRedirect("error", "/sign-in", error.message);
+  }
+
+  return redirect("/protected");
+};
+
+export const forgotPasswordAction = async (formData: FormData) => {
+  const email = formData.get("email")?.toString();
+  const supabase = createClient();
+  const origin = headers().get("origin");
+  const callbackUrl = formData.get("callbackUrl")?.toString();
+
+  if (!email) {
+    return encodedRedirect("error", "/forgot-password", "Email is required");
+  }
+
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${origin}/auth/callback?redirect_to=/protected/reset-password`,
+  });
+
+  if (error) {
+    console.error(error.message);
+    return encodedRedirect(
+      "error",
+      "/forgot-password",
+      "Could not reset password",
+    );
+  }
+
+  if (callbackUrl) {
+    return redirect(callbackUrl);
+  }
+
+  return encodedRedirect(
+    "success",
+    "/forgot-password",
+    "Check your email for a link to reset your password.",
+  );
+};
+
+export const resetPasswordAction = async (formData: FormData) => {
+  const supabase = createClient();
+
+  const password = formData.get("password") as string;
+  const confirmPassword = formData.get("confirmPassword") as string;
+
+  if (!password || !confirmPassword) {
+    encodedRedirect(
+      "error",
+      "/protected/reset-password",
+      "Password and confirm password are required",
+    );
+  }
+
+  if (password !== confirmPassword) {
+    encodedRedirect(
+      "error",
+      "/protected/reset-password",
+      "Passwords do not match",
+    );
+  }
+
+  const { error } = await supabase.auth.updateUser({
+    password: password,
+  });
+
+  if (error) {
+    encodedRedirect(
+      "error",
+      "/protected/reset-password",
+      "Password update failed",
+    );
+  }
+
+  encodedRedirect("success", "/protected/reset-password", "Password updated");
+};
+
+export const signOutAction = async () => {
+  const supabase = createClient();
+  await supabase.auth.signOut();
+  return redirect("/sign-in");
+};
+
+
+--------------------------------------------------
+File End
+--------------------------------------------------
+
+
+./app/layout.tsx
+File type: .tsx
+// app/layout.tsx
+import { ThemeProvider } from "next-themes";
+import { GeistSans } from "geist/font/sans";
+import Sidebar from "@/components/Sidebar";
+import Header from "@/components/Header";
+import "./globals.css";
+
+export const metadata = {
+  title: "Love in Action",
+  description: "Sponsor dashboard for Love in Action",
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en" className={GeistSans.className} suppressHydrationWarning>
+      <body className="bg-gray-100 dark:bg-gray-900">
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <div className="flex h-screen">
+            <Sidebar />
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <Header />
+              <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 dark:bg-gray-900">
+                <div className="container mx-auto px-6 py-8">
+                  {children}
+                </div>
+              </main>
+            </div>
+          </div>
+        </ThemeProvider>
+      </body>
+    </html>
+  );
+}
+
+--------------------------------------------------
+File End
+--------------------------------------------------
+
+
+./app/page.tsx
+File type: .tsx
+import Hero from "@/components/hero";
+import ConnectSupabaseSteps from "@/components/tutorial/connect-supabase-steps";
+import SignUpUserSteps from "@/components/tutorial/sign-up-user-steps";
+import { hasEnvVars } from "@/utils/supabase/check-env-vars";
+
+export default async function Index() {
+  return (
+    <>
+      <Hero />
+      <main className="flex-1 flex flex-col gap-6 px-4">
+        <h2 className="font-medium text-xl mb-4">Next steps</h2>
+        {hasEnvVars ? <SignUpUserSteps /> : <ConnectSupabaseSteps />}
+      </main>
+    </>
+  );
+}
+
+
+--------------------------------------------------
+File End
+--------------------------------------------------
+
+
+./app/globals.css
+File type: .css
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 3.9%;
+    --primary: 0 0% 9%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 96.1%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 96.1%;
+    --muted-foreground: 0 0% 45.1%;
+    --accent: 0 0% 96.1%;
+    --accent-foreground: 0 0% 9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 89.8%;
+    --input: 0 0% 89.8%;
+    --ring: 0 0% 3.9%;
+    --radius: 0.5rem;
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+  }
+
+  .dark {
+    --background: 0 0% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 0 0% 9%;
+    --secondary: 0 0% 14.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 14.9%;
+    --muted-foreground: 0 0% 63.9%;
+    --accent: 0 0% 14.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 14.9%;
+    --input: 0 0% 14.9%;
+    --ring: 0 0% 83.1%;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+
+--------------------------------------------------
+File End
+--------------------------------------------------
+
+
+./app/(auth-pages)/smtp-message.tsx
+File type: .tsx
+import { ArrowUpRight, InfoIcon } from "lucide-react";
+import Link from "next/link";
+
+export function SmtpMessage() {
+  return (
+    <div className="bg-muted/50 px-5 py-3 border rounded-md flex gap-4">
+      <InfoIcon size={16} className="mt-0.5" />
+      <div className="flex flex-col gap-1">
+        <small className="text-sm text-secondary-foreground">
+          <strong> Note:</strong> Emails are limited to 4 per hour. Enable a
+          custom SMTP endpoint to increase the rate limit.
+        </small>
+        <div>
+          <Link
+            href="https://supabase.com/docs/guides/auth/auth-smtp"
+            target="_blank"
+            className="text-primary/50 hover:text-primary flex items-center text-sm gap-1"
+          >
+            Learn more <ArrowUpRight size={14} />
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+--------------------------------------------------
+File End
+--------------------------------------------------
+
+
+./app/(auth-pages)/layout.tsx
+File type: .tsx
+export default async function Layout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="max-w-7xl flex flex-col gap-12 items-start">{children}</div>
+  );
+}
+
+
+--------------------------------------------------
+File End
+--------------------------------------------------
+
+
+./app/(auth-pages)/sign-up/page.tsx
+File type: .tsx
+import { signUpAction } from "@/app/actions";
+import { FormMessage, Message } from "@/components/form-message";
+import { SubmitButton } from "@/components/submit-button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import Link from "next/link";
+import { SmtpMessage } from "../smtp-message";
+
+export default function Signup({ searchParams }: { searchParams: Message }) {
+  if ("message" in searchParams) {
+    return (
+      <div className="w-full flex-1 flex items-center h-screen sm:max-w-md justify-center gap-2 p-4">
+        <FormMessage message={searchParams} />
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <form className="flex flex-col min-w-64 max-w-64 mx-auto">
+        <h1 className="text-2xl font-medium">Sign up</h1>
+        <p className="text-sm text text-foreground">
+          Already have an account?{" "}
+          <Link className="text-primary font-medium underline" href="/sign-in">
+            Sign in
+          </Link>
+        </p>
+        <div className="flex flex-col gap-2 [&>input]:mb-3 mt-8">
+          <Label htmlFor="email">Email</Label>
+          <Input name="email" placeholder="you@example.com" required />
+          <Label htmlFor="password">Password</Label>
+          <Input
+            type="password"
+            name="password"
+            placeholder="Your password"
+            minLength={6}
+            required
+          />
+          <SubmitButton formAction={signUpAction} pendingText="Signing up...">
+            Sign up
+          </SubmitButton>
+          <FormMessage message={searchParams} />
+        </div>
+      </form>
+      <SmtpMessage />
+    </>
+  );
+}
+
+
+--------------------------------------------------
+File End
+--------------------------------------------------
+
+
+./app/(auth-pages)/forgot-password/page.tsx
+File type: .tsx
+import { forgotPasswordAction } from "@/app/actions";
+import { FormMessage, Message } from "@/components/form-message";
+import { SubmitButton } from "@/components/submit-button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import Link from "next/link";
+import { SmtpMessage } from "../smtp-message";
+
+export default function ForgotPassword({
+  searchParams,
+}: {
+  searchParams: Message;
+}) {
+  return (
+    <>
+      <form className="flex-1 flex flex-col w-full gap-2 text-foreground [&>input]:mb-6 min-w-64 max-w-64 mx-auto">
+        <div>
+          <h1 className="text-2xl font-medium">Reset Password</h1>
+          <p className="text-sm text-secondary-foreground">
+            Already have an account?{" "}
+            <Link className="text-primary underline" href="/sign-in">
+              Sign in
+            </Link>
+          </p>
+        </div>
+        <div className="flex flex-col gap-2 [&>input]:mb-3 mt-8">
+          <Label htmlFor="email">Email</Label>
+          <Input name="email" placeholder="you@example.com" required />
+          <SubmitButton formAction={forgotPasswordAction}>
+            Reset Password
+          </SubmitButton>
+          <FormMessage message={searchParams} />
+        </div>
+      </form>
+      <SmtpMessage />
+    </>
+  );
+}
+
+
+--------------------------------------------------
+File End
+--------------------------------------------------
+
+
+./app/(auth-pages)/sign-in/page.tsx
+File type: .tsx
+import { signInAction } from "@/app/actions";
+import { FormMessage, Message } from "@/components/form-message";
+import { SubmitButton } from "@/components/submit-button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import Link from "next/link";
+
+export default function Login({ searchParams }: { searchParams: Message }) {
+  return (
+    <form className="flex-1 flex flex-col min-w-64">
+      <h1 className="text-2xl font-medium">Sign in</h1>
+      <p className="text-sm text-foreground">
+        Don't have an account?{" "}
+        <Link className="text-foreground font-medium underline" href="/sign-up">
+          Sign up
+        </Link>
+      </p>
+      <div className="flex flex-col gap-2 [&>input]:mb-3 mt-8">
+        <Label htmlFor="email">Email</Label>
+        <Input name="email" placeholder="you@example.com" required />
+        <div className="flex justify-between items-center">
+          <Label htmlFor="password">Password</Label>
+          <Link
+            className="text-xs text-foreground underline"
+            href="/forgot-password"
+          >
+            Forgot Password?
+          </Link>
+        </div>
+        <Input
+          type="password"
+          name="password"
+          placeholder="Your password"
+          required
+        />
+        <SubmitButton pendingText="Signing In..." formAction={signInAction}>
+          Sign in
+        </SubmitButton>
+        <FormMessage message={searchParams} />
+      </div>
+    </form>
+  );
+}
+
+
+--------------------------------------------------
+File End
+--------------------------------------------------
+
+
+./app/auth/callback/route.ts
+File type: .ts
+import { createClient } from "@/utils/supabase/server";
+import { NextResponse } from "next/server";
+
+export async function GET(request: Request) {
+  // The `/auth/callback` route is required for the server-side auth flow implemented
+  // by the SSR package. It exchanges an auth code for the user's session.
+  // https://supabase.com/docs/guides/auth/server-side/nextjs
+  const requestUrl = new URL(request.url);
+  const code = requestUrl.searchParams.get("code");
+  const origin = requestUrl.origin;
+  const redirectTo = requestUrl.searchParams.get("redirect_to")?.toString();
+
+  if (code) {
+    const supabase = createClient();
+    await supabase.auth.exchangeCodeForSession(code);
+  }
+
+  if (redirectTo) {
+    return NextResponse.redirect(`${origin}${redirectTo}`);
+  }
+
+  // URL to redirect to after sign up process completes
+  return NextResponse.redirect(`${origin}/protected`);
+}
+
+
+--------------------------------------------------
+File End
+--------------------------------------------------
+
+
+./app/components/Header.tsx
+File type: .tsx
+// components/Header.tsx
+import { Bell } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+
+const Header = () => {
+  return (
+    <header className="bg-white dark:bg-gray-800 shadow-md">
+      <div className="container mx-auto px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="w-1/3">
+          </div>
+          <div className="flex items-center">
+            <button className="mr-4 relative">
+              <Bell size={20} />
+              <span className="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-red-100 transform translate-x-1/2 -translate-y-1/2 bg-red-600 rounded-full">2</span>
+            </button>
+            <div className="flex items-center">
+              <Avatar>
+                <AvatarImage src="/avatar.png" alt="Dr Dereje B" />
+                <AvatarFallback>DB</AvatarFallback>
+              </Avatar>
+              <span className="ml-2 font-medium text-gray-800 dark:text-gray-200">Dr Dereje B</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+};
+
+export default Header;
+
+--------------------------------------------------
+File End
+--------------------------------------------------
+
+
+./app/components/Sidebar.tsx
+File type: .tsx
+"use client"
+
+import Link from 'next/link';
+import Image from 'next/image';
+import { Home, Users, DollarSign, User } from 'lucide-react';
+import { useRouter } from 'next/navigation'; // Updated import
+import { createClient } from '@/utils/supabase/client';
+import { useEffect, useState } from 'react';
+
+const Sidebar = () => {
+  const [sponsorId, setSponsorId] = useState<string | null>(null);
+  const [sponseeId, setSponseeId] = useState<string | null>(null);
+  const supabase = createClient();
+  const router = useRouter(); // Updated hook
+
+  useEffect(() => {
+    const fetchSponsorId = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data, error } = await supabase
+          .from('Sponsors')
+          .select('id')
+          .eq('Email', user.email)
+          .single();
+        if (data) {
+          setSponsorId(data.id);
+        } else if (error) {
+          console.error('Error fetching sponsor id:', error);
+        }
+      }
+    };
+    
+
+    fetchSponsorId();
+  }, []);
+
+  return (
+    <div className="bg-blue-900 text-white w-64 space-y-6 py-7 px-2 absolute inset-y-0 left-0 transform -translate-x-full md:relative md:translate-x-0 transition duration-200 ease-in-out">
+      <div className="flex items-center space-x-2 px-4 mb-6">
+        <Image
+          src="/lia_logo/color_icon_transparent@600x.png"
+          alt="Love in Action"
+          width={40}
+          height={40}
+        />
+        <span className="text-2xl font-extrabold">love in action</span>
+      </div>
+      <nav>
+        <Link href="/dashboard" className="block py-2.5 px-4 rounded transition duration-200 hover:bg-blue-800">
+          <Home className="inline-block mr-2" size={20} /> All Statistics
+        </Link>
+        <Link href={sponsorId ? `/children/${sponsorId}` : "/children"} className="block py-2.5 px-4 rounded transition duration-200 hover:bg-blue-800">
+          <Users className="inline-block mr-2" size={20} /> Your Children
+        </Link>
+        <Link href="/donation" className="block py-2.5 px-4 rounded transition duration-200 hover:bg-blue-800">
+          <DollarSign className="inline-block mr-2" size={20} /> Donation
+        </Link>
+        <Link href="/profile" className="block py-2.5 px-4 rounded transition duration-200 hover:bg-blue-800">
+          <User className="inline-block mr-2" size={20} /> Profile
+        </Link>
+      </nav>
+    </div>
+  );
+};
+
+export default Sidebar;
+
+--------------------------------------------------
+File End
+--------------------------------------------------
+
+
+./app/components/ChildDetails.tsx
+File type: .tsx
+import React from 'react';
+import Image from 'next/image';
+import { User, MapPin, GraduationCap, HeartHandshake, Calendar } from 'lucide-react';
+
+interface ChildData {
+  "First Name": string;
+  "Last Name": string;
+  gender: string;
+  location: string;
+  grade: string;
+  aspiration: string;
+  bio: string;
+  bod: string;
+  profile: string;
+}
+
+const ChildDetails: React.FC<{ childData: ChildData }> = ({ childData }) => {
+  const calculateAge = (birthDate: string) => {
+    const ageDifMs = Date.now() - new Date(birthDate).getTime();
+    const ageDate = new Date(ageDifMs);
+    return Math.abs(ageDate.getUTCFullYear() - 1970);
+  };
+
+  return (
+    <div className="bg-gray-800 text-white rounded-lg shadow-lg p-6">
+      <div className="flex flex-col md:flex-row">
+        <div className="md:w-1/3 mb-4 md:mb-0">
+          <Image 
+            src={childData.profile} 
+            alt={`${childData['First Name']} ${childData['Last Name']}`} 
+            width={300} 
+            height={300} 
+            className="rounded-lg object-cover"
+          />
+        </div>
+        <div className="md:w-2/3 md:pl-6">
+          <h2 className="text-3xl font-bold mb-2">{`${childData['First Name']} ${childData['Last Name']}`}</h2>
+          <p className="text-xl text-purple-400 mb-4">{`Aspires to be a ${childData.aspiration}`}</p>
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="flex items-center">
+              <User className="mr-2" size={20} />
+              <span>{childData.gender}</span>
+            </div>
+            <div className="flex items-center">
+              <MapPin className="mr-2" size={20} />
+              <span>{childData.location}</span>
+            </div>
+            <div className="flex items-center">
+              <GraduationCap className="mr-2" size={20} />
+              <span>{`Grade ${childData.grade}`}</span>
+            </div>
+            <div className="flex items-center">
+              <Calendar className="mr-2" size={20} />
+              <span>{`${calculateAge(childData.bod)} years old`}</span>
+            </div>
+          </div>
+          <p className="text-gray-300 mb-4">{childData.bio}</p>
+          <div className="bg-gray-700 p-4 rounded-lg">
+            <h3 className="text-xl font-semibold mb-2 flex items-center">
+              <HeartHandshake className="mr-2" size={24} />
+              Sponsorship Status
+            </h3>
+            <p>{childData.sponsor_id ? "Sponsored" : "Awaiting Sponsorship"}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ChildDetails;
+
+--------------------------------------------------
+File End
+--------------------------------------------------
+
+
+./app/components/ui/avatar.tsx
+File type: .tsx
+import React from 'react';
+
+interface AvatarProps {
+  src?: string;
+  alt?: string;
+  fallback?: string;
+}
+
+export const Avatar: React.FC<AvatarProps> = ({ src, alt, fallback }) => {
+  return (
+    <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-300">
+      {src ? (
+        <img src={src} alt={alt} className="w-full h-full object-cover" />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center text-gray-600">
+          {fallback || alt?.charAt(0).toUpperCase()}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export const AvatarImage: React.FC<{ src: string; alt: string }> = ({ src, alt }) => (
+  <img src={src} alt={alt} className="w-full h-full object-cover" />
+);
+
+export const AvatarFallback: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div className="w-full h-full flex items-center justify-center text-gray-600">
+    {children}
+  </div>
+);
+
+--------------------------------------------------
+File End
+--------------------------------------------------
+
+
+./app/protected/page.tsx
+File type: .tsx
+import FetchDataSteps from "@/components/tutorial/fetch-data-steps";
+import { createClient } from "@/utils/supabase/server";
+import { InfoIcon } from "lucide-react";
+import { redirect } from "next/navigation";
+
+export default async function ProtectedPage() {
+  const supabase = createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return redirect("/sign-in");
+  }
+
+  // Fetch Sponsors data for the logged-in user
+  const { data: sponsorsData, error: sponsorsError } = await supabase
+    .from("Sponsors")
+    .select("*")
+    .eq("Email", user.email)
+    .single();
+
+  if (sponsorsError) {
+    console.error("Error fetching Sponsors data:", sponsorsError);
+  }
+
+  // Fetch Sponsees data for the logged-in user
+  let sponseesData = null;
+  let sponseesError = null;
+  
+  if (sponsorsData && sponsorsData.Sponsee_id) {
+    const { data, error } = await supabase
+      .from("Sponsees")
+      .select("*")
+      .eq("id", sponsorsData.Sponsee_id)
+      .single();
+    
+    sponseesData = data;
+    sponseesError = error;
+
+    if (sponseesError) {
+      console.error("Error fetching Sponsees data:", sponseesError);
+    }
+  }
+
+  return (
+    <div className="flex-1 w-full flex flex-col gap-12">
+      <div className="w-full">
+      </div>
+
+      <div className="flex flex-col gap-2 items-start">
+        <h2 className="font-bold text-2xl mb-4">Your Sponsees data</h2>
+        {sponseesData ? (
+          <pre className="text-xs font-mono p-3 rounded border max-h-64 overflow-auto">
+            {JSON.stringify(sponseesData, null, 2)}
+          </pre>
+        ) : (
+          <div>
+            <p>No Sponsees data found for this user.</p>
+            <p>Debug info:</p>
+            <pre className="text-xs font-mono p-3 rounded border max-h-64 overflow-auto">
+              {JSON.stringify({
+                sponseeId: sponsorsData?.Sponsee_id,
+                sponseesData,
+                sponseesError: sponseesError?.message,
+                sponseesErrorDetails: sponseesError
+              }, null, 2)}
+            </pre>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+--------------------------------------------------
+File End
+--------------------------------------------------
+
+
+./app/protected/reset-password/page.tsx
+File type: .tsx
+import { resetPasswordAction } from "@/app/actions";
+import { FormMessage, Message } from "@/components/form-message";
+import { SubmitButton } from "@/components/submit-button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+
+export default async function ResetPassword({
+  searchParams,
+}: {
+  searchParams: Message;
+}) {
+  return (
+    <form className="flex flex-col w-full max-w-md p-4 gap-2 [&>input]:mb-4">
+      <h1 className="text-2xl font-medium">Reset password</h1>
+      <p className="text-sm text-foreground/60">
+        Please enter your new password below.
+      </p>
+      <Label htmlFor="password">New password</Label>
+      <Input
+        type="password"
+        name="password"
+        placeholder="New password"
+        required
+      />
+      <Label htmlFor="confirmPassword">Confirm password</Label>
+      <Input
+        type="password"
+        name="confirmPassword"
+        placeholder="Confirm password"
+        required
+      />
+      <SubmitButton formAction={resetPasswordAction}>
+        Reset password
+      </SubmitButton>
+      <FormMessage message={searchParams} />
+    </form>
+  );
+}
+
+
+--------------------------------------------------
+File End
+--------------------------------------------------
+
+
+./app/children/[sponsorId]/page.tsx
+File type: .tsx
+import { createClient } from '@/utils/supabase/server';
+import { notFound } from 'next/navigation';
+import Link from 'next/link';
+import Image from 'next/image';
+
+export default async function ChildrenPage({ params }: { params: { sponsorId: string } }) {
+  const supabase = createClient();
+
+  // Check if user is authenticated
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) {
+    return <div>Please log in to view this page.</div>;
+  }
+
+  // Fetch sponsor data to ensure the logged-in user is accessing their own data
+  const { data: sponsorData, error: sponsorError } = await supabase
+    .from('Sponsors')
+    .select('*')
+    .eq('id', params.sponsorId)
+    .single();
+
+  if (sponsorError || !sponsorData || sponsorData.Email !== user.email) {
+    return notFound();
+  }
+
+  // Fetch sponsored children
+  const { data: children, error: childrenError } = await supabase
+    .from('Sponsees')
+    .select('*')
+    .eq('sponsor_id', params.sponsorId);
+
+  if (childrenError) {
+    console.error('Error fetching children:', childrenError);
+    return <div>Error loading children data.</div>;
+  }
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="text-3xl font-bold mb-6 text-white">Your Sponsored Children</h1>
+      {children && children.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {children.map((child) => (
+            <Link href={`/children/details/${child.id}`} key={child.id}>
+              <div className="bg-gray-800 rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow duration-300">
+                <div className="flex items-center mb-4">
+                  {child.profile ? (
+                    <Image
+                      src={child.profile}
+                      alt={`${child['First Name']} ${child['Last Name']}`}
+                      width={64}
+                      height={64}
+                      className="rounded-full mr-4"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 bg-gray-600 rounded-full mr-4 flex items-center justify-center">
+                      <span className="text-2xl text-white">{child['First Name'][0]}</span>
+                    </div>
+                  )}
+                  <div>
+                    <h2 className="text-xl font-semibold text-white">{`${child['First Name']} ${child['Last Name']}`}</h2>
+                    <p className="text-sm text-gray-400">{child.location}</p>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-300 mb-2"><strong>Age:</strong> {new Date().getFullYear() - new Date(child.bod).getFullYear()}</p>
+                <p className="text-sm text-gray-300 mb-2"><strong>Grade:</strong> {child.grade}</p>
+                <p className="text-sm text-gray-300"><strong>Aspiration:</strong> {child.aspiration}</p>
+              </div>
+            </Link>
+          ))}
+        </div>
+      ) : (
+        <p className="text-white">You have no sponsored children at the moment.</p>
+      )}
+    </div>
+  );
+}
+
+--------------------------------------------------
+File End
+--------------------------------------------------
+
+
+./app/children/[id]/page.tsx
+File type: .tsx
+import { createClient } from '@/utils/supabase/server';
+import ChildDetails from '@/components/ChildDetails';
+
+export default async function ChildPage({ params }: { params: { id: string } }) {
+  const supabase = createClient();
+
+  try {
+    const { data: childData, error } = await supabase
+      .from('Sponsees')
+      .select('*')
+      .eq('id', params.id)
+      .single();
+
+    if (error) {
+      console.error('Error fetching child data:', error);
+      return <div className="text-red-500">Error: {error.message}</div>;
+    }
+
+    if (!childData) {
+      console.error('No child data found');
+      return <div className="text-yellow-500">No child data found</div>;
+    }
+
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <h1 className="text-3xl font-bold mb-6 text-white">Child Details</h1>
+        <ChildDetails childData={childData} />
+      </div>
+    );
+  } catch (error) {
+    console.error('Unexpected error:', error);
+    return <div className="text-red-500">An unexpected error occurred</div>;
+  }
+}
+
+--------------------------------------------------
+File End
+--------------------------------------------------
