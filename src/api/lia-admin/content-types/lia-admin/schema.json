@@ -4,10 +4,11 @@
   "info": {
     "singularName": "lia-admin",
     "pluralName": "lia-admins",
-    "displayName": "LiaAdmin"
+    "displayName": "LiaAdmin",
+    "description": ""
   },
   "options": {
-    "draftAndPublish": true
+    "draftAndPublish": false
   },
   "pluginOptions": {},
   "attributes": {

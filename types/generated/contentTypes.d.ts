@@ -491,9 +491,10 @@ export interface ApiLiaAdminLiaAdmin extends Struct.CollectionTypeSchema {
     singularName: 'lia-admin';
     pluralName: 'lia-admins';
     displayName: 'LiaAdmin';
+    description: '';
   };
   options: {
-    draftAndPublish: true;
+    draftAndPublish: false;
   };
   attributes: {
     First_Name: Schema.Attribute.String;
