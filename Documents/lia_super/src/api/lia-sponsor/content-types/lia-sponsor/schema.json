@@ -1,0 +1,53 @@
+{
+  "kind": "collectionType",
+  "collectionName": "lia_sponsors",
+  "info": {
+    "singularName": "lia-sponsor",
+    "pluralName": "lia-sponsors",
+    "displayName": "Lia_Sponsor"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "First_name": {
+      "type": "string"
+    },
+    "Last_name": {
+      "type": "string"
+    },
+    "Email": {
+      "type": "email"
+    },
+    "Amount": {
+      "type": "decimal"
+    },
+    "First_payment_date": {
+      "type": "datetime"
+    },
+    "Last_payment_date": {
+      "type": "datetime"
+    },
+    "Address": {
+      "type": "string"
+    },
+    "City": {
+      "type": "string"
+    },
+    "Postal_code": {
+      "type": "integer"
+    },
+    "Country": {
+      "type": "string"
+    },
+    "Phone": {
+      "type": "string"
+    },
+    "lia_sponsees": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::lia-sponsee.lia-sponsee"
+    }
+  }
+}
