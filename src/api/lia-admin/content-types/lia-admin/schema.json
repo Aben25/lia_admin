@@ -1,0 +1,18 @@
+{
+  "kind": "collectionType",
+  "collectionName": "lia_admins",
+  "info": {
+    "singularName": "lia-admin",
+    "pluralName": "lia-admins",
+    "displayName": "LiaAdmin"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "First_Name": {
+      "type": "string"
+    }
+  }
+}

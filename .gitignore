@@ -1,0 +1,36 @@
+# OS files
+.DS_Store
+Thumbs.db
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Strapi
+.cache
+build
+.strapi-updater.json
+.strapi-cloud.json
+
+# Environment variables
+.env
+.env.*
+
+# Logs
+*.log
+
+# Temp files
+.tmp/
+.temp/
+
+# IDE
+.vscode/
+.idea/
+
+# Other
+*.swp
+*.swo
+*.swn
+*.bak
+*.orig

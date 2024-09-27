@@ -1,0 +1,72 @@
+{
+  "kind": "collectionType",
+  "collectionName": "lia_sponsees",
+  "info": {
+    "singularName": "lia-sponsee",
+    "pluralName": "lia-sponsees",
+    "displayName": "lia_Sponsee",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "First_Name": {
+      "type": "string"
+    },
+    "Last_Name": {
+      "type": "string"
+    },
+    "Gender": {
+      "type": "enumeration",
+      "enum": [
+        "Male",
+        "Female"
+      ]
+    },
+    "Location": {
+      "type": "string"
+    },
+    "Grade": {
+      "type": "string"
+    },
+    "Bio": {
+      "type": "blocks"
+    },
+    "Bod": {
+      "type": "date"
+    },
+    "Profile_pic": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
+      "allowedTypes": [
+        "images",
+        "files",
+        "videos",
+        "audios"
+      ]
+    },
+    "Parent_info": {
+      "type": "enumeration",
+      "enum": [
+        "Mother",
+        "Father",
+        "Father & Mother",
+        "None"
+      ]
+    },
+    "Gallery": {
+      "type": "media",
+      "multiple": true,
+      "required": false,
+      "allowedTypes": [
+        "images",
+        "files",
+        "videos",
+        "audios"
+      ]
+    }
+  }
+}
